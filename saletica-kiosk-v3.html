@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Saletica Kiosk</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;700&family=DM+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #03080F;
+  --surface: #091524;
+  --surface2: #0F2035;
+  --accent: #00C8FF;
+  --accent2: #0066AA;
+  --accent-soft: rgba(0,200,255,0.1);
+  --text: #DCF0FF;
+  --text-dim: #4A7A9B;
+  --border: rgba(0,200,255,0.15);
+  --danger: #FF3D5A;
+  --warn: #FFB800;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+body {
+  font-family:'DM Sans','Noto Sans Thai',sans-serif;
+  background:var(--bg); color:var(--text);
+  touch-action:manipulation;
+}
+
+/* ── IDLE ── */
+#idle {
+  position:fixed; inset:0; z-index:10;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:32px;
+  background:var(--bg);
+  transition:opacity 0.6s;
+}
+#idle.off { opacity:0; pointer-events:none; }
+
+.grid-bg {
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(0,200,255,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,200,255,0.03) 1px,transparent 1px);
+  background-size:48px 48px;
+  animation:gridMove 20s linear infinite;
+}
+@keyframes gridMove { to { background-position:0 48px; } }
+
+.glow-top {
+  position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:600px; height:300px;
+  background:radial-gradient(ellipse at 50% 0%, rgba(0,200,255,0.08) 0%, transparent 70%);
+  pointer-events:none;
+}
+
+.pulse-ring {
+  position:relative; width:140px; height:140px;
+  display:flex; align-items:center; justify-content:center;
+}
+.pulse-ring::before, .pulse-ring::after {
+  content:''; position:absolute; inset:0; border-radius:50%;
+  border:1px solid rgba(0,200,255,0.25);
+  animation:pulseRing 3s ease-out infinite;
+}
+.pulse-ring::after { animation-delay:1.5s; }
+@keyframes pulseRing {
+  0% { transform:scale(0.85); opacity:0.8; }
+  100% { transform:scale(1.6); opacity:0; }
+}
+
+.ai-face {
+  width:100px; height:100px; border-radius:50%;
+  background:linear-gradient(145deg, #0D3A5C, #001F3F);
+  border:2px solid var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  font-size:46px; z-index:1;
+  box-shadow:0 0 40px rgba(0,200,255,0.3);
+  animation:breathe 4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,100%{ box-shadow:0 0 30px rgba(0,200,255,0.2); transform:scale(1); }
+  50%{ box-shadow:0 0 60px rgba(0,200,255,0.45); transform:scale(1.04); }
+}
+
+.idle-title {
+  font-size:32px; font-weight:700; text-align:center; line-height:1.25;
+  letter-spacing:-0.5px;
+}
+.idle-title em { color:var(--accent); font-style:normal; }
+
+.idle-sub {
+  font-size:15px; color:var(--text-dim); text-align:center; line-height:1.8;
+  font-family:'Noto Sans Thai',sans-serif;
+}
+
+.tap-btn {
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; border-radius:50px;
+  padding:18px 48px; font-size:17px; font-weight:600;
+  color:#fff; cursor:pointer;
+  font-family:'Noto Sans Thai',sans-serif;
+  box-shadow:0 6px 30px rgba(0,200,255,0.35);
+  animation:tapPulse 2.5s ease-in-out infinite;
+  position:relative; z-index:1;
+}
+@keyframes tapPulse {
+  0%,100%{ transform:scale(1); box-shadow:0 6px 30px rgba(0,200,255,0.35); }
+  50%{ transform:scale(1.03); box-shadow:0 8px 40px rgba(0,200,255,0.55); }
+}
+
+/* ── GREETING ── */
+#greeting {
+  position:fixed; inset:0; z-index:20;
+  background:rgba(3,8,15,0.88);
+  backdrop-filter:blur(10px);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.5s;
+}
+#greeting.on { opacity:1; pointer-events:all; }
+
+.greet-card {
+  background:var(--surface);
+  border:1px solid rgba(0,200,255,0.3);
+  border-radius:28px; padding:48px 48px;
+  text-align:center; max-width:420px; width:90%;
+  box-shadow:0 0 80px rgba(0,200,255,0.12);
+  animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes popIn {
+  from{ transform:scale(0.85); opacity:0; }
+  to{ transform:scale(1); opacity:1; }
+}
+.wave-emoji { font-size:52px; display:block; margin-bottom:18px; animation:waveHand 0.8s ease; }
+@keyframes waveHand {
+  0%,100%{transform:rotate(0);}
+  30%{transform:rotate(-20deg);}
+  70%{transform:rotate(20deg);}
+}
+.greet-title { font-size:26px; font-weight:700; margin-bottom:12px; font-family:'Noto Sans Thai',sans-serif; }
+.greet-sub { font-size:14px; color:var(--text-dim); line-height:1.8; margin-bottom:28px; font-family:'Noto Sans Thai',sans-serif; }
+.greet-start {
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; border-radius:14px; padding:15px 36px;
+  font-size:16px; font-weight:600; color:#fff; cursor:pointer;
+  font-family:'Noto Sans Thai',sans-serif;
+  box-shadow:0 4px 20px rgba(0,200,255,0.3);
+  width:100%;
+}
+
+/* ── MAIN ── */
+#main {
+  display:flex; flex-direction:column; height:100%;
+  opacity:0; pointer-events:none; transition:opacity 0.5s;
+}
+#main.on { opacity:1; pointer-events:all; }
+
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  background:rgba(9,21,36,0.95);
+  backdrop-filter:blur(12px);
+  flex-shrink:0;
+}
+.brand { display:flex; align-items:center; gap:10px; }
+.brand-ico {
+  width:38px; height:38px; border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; box-shadow:0 0 16px rgba(0,200,255,0.3);
+}
+.brand-name { font-size:18px; font-weight:700; }
+.brand-name b { color:var(--accent); }
+.brand-loc { font-size:10px; color:var(--text-dim); letter-spacing:1px; text-transform:uppercase; }
+.topbar-right { display:flex; align-items:center; gap:10px; }
+.online-badge {
+  display:flex; align-items:center; gap:6px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:20px; padding:5px 12px; font-size:11px; color:var(--text-dim);
+}
+.dot { width:6px; height:6px; border-radius:50%; background:#00FF88; animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+.clock { font-size:14px; font-weight:600; color:var(--accent); font-variant-numeric:tabular-nums; }
+
+/* session bar */
+.sessbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:7px 20px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.dots-wrap { display:flex; align-items:center; gap:6px; }
+.dots { display:flex; gap:3px; }
+.d {
+  width:9px; height:9px; border-radius:2px;
+  background:var(--surface2); border:1px solid var(--border);
+  transition:all 0.3s;
+}
+.d.on { background:var(--accent); border-color:var(--accent); }
+.d.warn { background:var(--warn); border-color:var(--warn); }
+.sess-label { font-size:11px; color:var(--text-dim); }
+.new-btn {
+  background:transparent; border:1px solid var(--border);
+  border-radius:6px; padding:4px 12px;
+  color:var(--text-dim); font-size:11px; cursor:pointer;
+  font-family:'Noto Sans Thai',sans-serif; transition:all 0.2s;
+}
+.new-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* chat */
+.chat { flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:14px; }
+.chat::-webkit-scrollbar { width:4px; }
+.chat::-webkit-scrollbar-track { background:transparent; }
+.chat::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+.msg { display:flex; gap:10px; animation:msgIn 0.3s ease; }
+.msg.user { flex-direction:row-reverse; }
+@keyframes msgIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:none;} }
+
+.av {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; flex-shrink:0;
+}
+.av.ai { background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 0 12px rgba(0,200,255,0.25); }
+.av.usr { background:var(--surface2); border:1px solid var(--border); }
+
+.bub {
+  max-width:74%; padding:12px 16px; border-radius:16px;
+  font-size:15px; line-height:1.75;
+  font-family:'Noto Sans Thai','DM Sans',sans-serif;
+}
+.msg.ai .bub { background:var(--surface); border:1px solid var(--border); border-top-left-radius:4px; }
+.msg.user .bub { background:linear-gradient(135deg,var(--accent2),#003D7A); border-top-right-radius:4px; }
+
+.typing { display:flex; gap:5px; align-items:center; padding:4px 0; }
+.typing span { width:7px; height:7px; border-radius:50%; background:var(--accent); animation:tb 1.2s ease-in-out infinite; }
+.typing span:nth-child(2){animation-delay:.2s;}
+.typing span:nth-child(3){animation-delay:.4s;}
+@keyframes tb { 0%,100%{transform:translateY(0);opacity:.3;} 50%{transform:translateY(-7px);opacity:1;} }
+
+.limit-note { text-align:center; color:var(--warn); font-size:13px; padding:10px; font-family:'Noto Sans Thai',sans-serif; }
+
+/* suggestions */
+.sugs {
+  display:flex; flex-wrap:wrap; gap:8px;
+  padding:0 20px 10px; flex-shrink:0;
+}
+.sug {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:20px; padding:8px 15px;
+  font-size:13px; font-family:'Noto Sans Thai',sans-serif;
+  color:var(--text-dim); cursor:pointer; transition:all 0.2s;
+}
+.sug:active, .sug:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+
+/* input */
+.input-wrap {
+  padding:10px 20px 18px;
+  border-top:1px solid var(--border);
+  background:rgba(9,21,36,0.95);
+  backdrop-filter:blur(12px);
+  flex-shrink:0;
+}
+.input-row { display:flex; gap:8px; align-items:flex-end; }
+.txt {
+  flex:1; background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:13px 16px;
+  color:var(--text); font-size:15px;
+  font-family:'Noto Sans Thai','DM Sans',sans-serif;
+  resize:none; outline:none;
+  min-height:50px; max-height:96px;
+  transition:border-color 0.2s;
+}
+.txt::placeholder { color:var(--text-dim); }
+.txt:focus { border-color:var(--accent); }
+
+.icon-btn {
+  width:50px; height:50px; border-radius:13px;
+  border:1px solid var(--border); background:var(--surface);
+  display:flex; align-items:center; justify-content:center;
+  font-size:21px; cursor:pointer; flex-shrink:0;
+  transition:all 0.2s; color:var(--text-dim);
+}
+.icon-btn:active { transform:scale(0.94); }
+.icon-btn.mic-on {
+  background:rgba(255,61,90,0.12);
+  border-color:var(--danger); color:var(--danger);
+  animation:micPulse 1s ease-in-out infinite;
+}
+@keyframes micPulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,61,90,0.25);}
+  50%{box-shadow:0 0 0 8px rgba(255,61,90,0);}
+}
+.send-btn-main {
+  width:50px; height:50px; border-radius:13px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; color:#fff; flex-shrink:0;
+  box-shadow:0 4px 18px rgba(0,200,255,0.3);
+  transition:all 0.2s;
+}
+.send-btn-main:active { transform:scale(0.95); }
+.send-btn-main:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+
+.footer-note {
+  text-align:center; font-size:10px; color:var(--text-dim);
+  opacity:0.4; margin-top:8px; letter-spacing:1px;
+}
+</style>
+</head>
+<body>
+
+<!-- IDLE -->
+<div id="idle">
+  <div class="grid-bg"></div>
+  <div class="glow-top"></div>
+  <div class="pulse-ring"><div class="ai-face">🤖</div></div>
+  <div class="idle-title">AI Receptionist<br><em>Saletica</em> พร้อมให้บริการ</div>
+  <div class="idle-sub">ยินดีต้อนรับสู่ Central World<br>สอบถามข้อมูลร้านค้า โปรโมชั่น และบริการต่างๆ</div>
+  <button class="tap-btn" onclick="showGreeting()">👋 แตะเพื่อเริ่มต้น</button>
+</div>
+
+<!-- GREETING -->
+<div id="greeting">
+  <div class="greet-card">
+    <span class="wave-emoji">👋</span>
+    <div class="greet-title">สวัสดีครับ ยินดีต้อนรับ!</div>
+    <div class="greet-sub">ผมคือ AI Receptionist ของ Saletica<br>ถามได้เลยครับ ทั้งตำแหน่งร้านค้า<br>โปรโมชั่น ที่จอดรถ หรือบริการต่างๆ</div>
+    <button class="greet-start" onclick="openMain()">เริ่มคุยกับ AI ➤</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-ico">⬡</div>
+      <div>
+        <div class="brand-name">Sale<b>tica</b> Kiosk</div>
+        <div class="brand-loc">Central World · ชั้น G · ทางเข้าหลัก</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="online-badge"><div class="dot"></div>Online</div>
+      <div class="clock" id="clk">--:--</div>
+    </div>
+  </div>
+
+  <div class="sessbar">
+    <div class="dots-wrap">
+      <div class="dots" id="dots"></div>
+      <span class="sess-label" id="sessLbl">0 / 8 ข้อความ</span>
+    </div>
+    <button class="new-btn" onclick="resetSession()">🔄 เริ่มใหม่</button>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="sugs" id="sugs">
+    <button class="sug" onclick="qs('ร้านอาหารญี่ปุ่นอยู่ชั้นไหน?')">🍣 ร้านญี่ปุ่น</button>
+    <button class="sug" onclick="qs('ห้องน้ำอยู่ที่ไหน?')">🚻 ห้องน้ำ</button>
+    <button class="sug" onclick="qs('วันนี้มีโปรโมชั่นอะไรบ้าง?')">🏷️ โปรโมชั่น</button>
+    <button class="sug" onclick="qs('ที่จอดรถอยู่ที่ไหน?')">🚗 ที่จอดรถ</button>
+    <button class="sug" onclick="qs('ATM อยู่ที่ไหน?')">🏧 ATM</button>
+    <button class="sug" onclick="qs('ต้องการเรียก staff ช่วย')">🙋 เรียก Staff</button>
+  </div>
+
+  <div class="input-wrap">
+    <div class="input-row">
+      <textarea class="txt" id="txt"
+        placeholder="พิมพ์หรือกดไมค์เพื่อพูด..."
+        onkeydown="onKey(event)" oninput="resize(this)" rows="1"></textarea>
+      <div class="icon-btn" id="micBtn" onclick="toggleMic()">🎤</div>
+      <button class="send-btn-main" id="sendBtn" onclick="send()">➤</button>
+    </div>
+    <div class="footer-note">SALETICA AI · CLAUDE API · ไม่บันทึกหรือส่งข้อมูลส่วนตัว</div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────
+const MAX_MSG = 8;
+const IDLE_SEC = 60; // วินาที
+
+const SYSTEM = `คุณคือ AI Receptionist ของ Saletica ประจำ Central World กรุงเทพฯ ชั้น G
+
+ข้อมูลอาคาร:
+- ชั้น G: ทางเข้าหลัก, ATM 3 จุด, ธนาคารกสิกร/กรุงไทย, Information counter, ห้องน้ำฝั่งตะวันออก
+- ชั้น 1: Zara, H&M, Uniqlo, แฟชั่นพรีเมี่ยม
+- ชั้น 2-3: เครื่องสำอาง, Boots, Watson, แฟชั่น
+- ชั้น 4: Power Buy, iStudio, ของใช้บ้าน, IT Zone
+- ชั้น 5: Tops Supermarket, ร้านอาหาร family style
+- ชั้น 6: โซนอาหาร — Oishi (ญี่ปุ่น), MK, The Pizza Company, ร้านไทย-นานาชาติ
+- ชั้น 7: SF Cinema 15 โรง, Entertainment Zone
+- B1-B2: ที่จอดรถ 5,000 คัน, ทางเข้า BTS Chidlom
+
+โปรโมชั่นวันนี้:
+- Zara: ลด 30% End of Season
+- SF Cinema: ซื้อ 2 ที่นั่งแถม popcorn ฟรี
+- Tops: ลด 15% สินค้าสดและผักผลไม้
+- Oishi ชั้น 6: Set lunch 199 บาท (11.00-14.00 น.)
+
+TOPIC GUARD: ตอบเฉพาะเรื่องในศูนย์การค้าเท่านั้น ถ้าถามเรื่องอื่นให้บอกว่า "ขออภัยครับ ผมช่วยได้เฉพาะเรื่องภายในศูนย์การค้านะครับ"
+
+สไตล์: ภาษาไทย เป็นมิตร กระชับ ตอบ 1-3 ประโยค ใช้ emoji 1-2 ตัว`;
+
+// ─── STATE ────────────────────────────
+let history = [];
+let count = 0;
+let busy = false;
+let listening = false;
+let recognition = null;
+let idleTimer = null;
+
+// ─── CLOCK ────────────────────────────
+function tick() {
+  const n = new Date();
+  document.getElementById('clk').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+tick(); setInterval(tick, 1000);
+
+// ─── DOTS ─────────────────────────────
+function updateDots() {
+  const c = document.getElementById('dots');
+  c.innerHTML = '';
+  for (let i = 0; i < MAX_MSG; i++) {
+    const d = document.createElement('div');
+    d.className = 'd' + (i < count ? (count >= MAX_MSG-2 ? ' warn' : ' on') : '');
+    c.appendChild(d);
+  }
+  document.getElementById('sessLbl').textContent = count + ' / ' + MAX_MSG + ' ข้อความ';
+}
+updateDots();
+
+// ─── IDLE TIMER ───────────────────────
+function resetIdle() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(goIdle, IDLE_SEC * 1000);
+}
+
+function goIdle() {
+  document.getElementById('main').classList.remove('on');
+  document.getElementById('idle').classList.remove('off');
+  resetSession(true);
+}
+
+// ─── SCREENS ──────────────────────────
+function showGreeting() {
+  document.getElementById('greeting').classList.add('on');
+  speak('สวัสดีครับ ยินดีต้อนรับสู่เซ็นทรัลเวิลด์ มีอะไรให้ช่วยได้บ้างครับ?');
+}
+
+function openMain() {
+  document.getElementById('greeting').classList.remove('on');
+  document.getElementById('idle').classList.add('off');
+  document.getElementById('main').classList.add('on');
+  resetIdle();
+  setTimeout(() => {
+    addMsg('ai', 'สวัสดีครับ 😊 ยินดีต้อนรับสู่ Central World ครับ มีอะไรให้ช่วยได้บ้าง? ถามเรื่องร้านค้า โปรโมชั่น ที่จอดรถ หรืออะไรก็ได้เลยครับ!');
+    history.push({ role:'assistant', content:'สวัสดีครับ ยินดีต้อนรับสู่ Central World มีอะไรให้ช่วยได้บ้าง?' });
+  }, 400);
+}
+
+// ─── RESET ────────────────────────────
+function resetSession(silent = false) {
+  history = []; count = 0; updateDots();
+  document.getElementById('chat').innerHTML = '';
+  document.getElementById('sugs').style.display = 'flex';
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  if (!silent) {
+    resetIdle();
+    setTimeout(() => {
+      addMsg('ai', 'เริ่มใหม่แล้วครับ 😊 มีอะไรให้ช่วยได้บ้าง?');
+      history.push({ role:'assistant', content:'เริ่มใหม่แล้วครับ มีอะไรให้ช่วยได้บ้าง?' });
+    }, 100);
+  }
+}
+
+// ─── VOICE ────────────────────────────
+function initRec() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.lang = 'th-TH'; r.continuous = false; r.interimResults = false;
+  r.onresult = e => {
+    document.getElementById('txt').value = e.results[0][0].transcript;
+    stopMic(); send();
+  };
+  r.onerror = r.onend = () => stopMic();
+  return r;
+}
+
+function toggleMic() {
+  if (listening) { stopMic(); return; }
+  if (!recognition) recognition = initRec();
+  if (!recognition) { alert('Browser ไม่รองรับ Voice — ใช้การพิมพ์แทนนะครับ'); return; }
+  listening = true;
+  document.getElementById('micBtn').classList.add('mic-on');
+  document.getElementById('micBtn').textContent = '⏹';
+  try { recognition.start(); } catch(e) { stopMic(); }
+  resetIdle();
+}
+
+function stopMic() {
+  listening = false;
+  document.getElementById('micBtn').classList.remove('mic-on');
+  document.getElementById('micBtn').textContent = '🎤';
+  try { recognition && recognition.stop(); } catch(e) {}
+}
+
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'th-TH'; u.rate = 1.0; u.pitch = 1.0;
+  const voices = window.speechSynthesis.getVoices();
+  const th = voices.find(v => v.lang.startsWith('th'));
+  if (th) u.voice = th;
+  window.speechSynthesis.speak(u);
+}
+
+// ─── SEND ─────────────────────────────
+function onKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+}
+
+function resize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 96) + 'px';
+}
+
+function qs(t) { document.getElementById('txt').value = t; send(); }
+
+async function send() {
+  const el = document.getElementById('txt');
+  const txt = el.value.trim();
+  if (!txt || busy) return;
+
+  if (count >= MAX_MSG) {
+    const chat = document.getElementById('chat');
+    if (!chat.querySelector('.limit-note')) {
+      const d = document.createElement('div');
+      d.className = 'limit-note';
+      d.textContent = '⏱ ครบ ' + MAX_MSG + ' ข้อความแล้วครับ กรุณากด "เริ่มใหม่"';
+      chat.appendChild(d);
+      chat.scrollTop = 9999;
+    }
+    return;
+  }
+
+  resetIdle();
+  document.getElementById('sugs').style.display = 'none';
+  addMsg('user', txt);
+  history.push({ role:'user', content:txt });
+  count++; updateDots();
+  el.value = ''; el.style.height = 'auto';
+
+  busy = true;
+  document.getElementById('sendBtn').disabled = true;
+  const typEl = addTyping();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM,
+        messages: history
+      })
+    });
+    const data = await res.json();
+    typEl.remove();
+    const reply = data.content?.[0]?.text || 'ขออภัยครับ เกิดข้อผิดพลาด กรุณาลองใหม่';
+    addMsg('ai', reply);
+    history.push({ role:'assistant', content:reply });
+    speak(reply);
+  } catch(e) {
+    typEl.remove();
+    addMsg('ai', '⚠️ ไม่สามารถเชื่อมต่อได้ครับ กรุณาลองใหม่อีกครั้ง');
+  }
+
+  busy = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+// ─── CHAT HELPERS ─────────────────────
+function addMsg(role, text) {
+  const c = document.getElementById('chat');
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  const av = role === 'user'
+    ? '<div class="av usr">👤</div>'
+    : '<div class="av ai">⬡</div>';
+  d.innerHTML = av + '<div class="bub">' + text.replace(/\n/g,'<br>') + '</div>';
+  c.appendChild(d); c.scrollTop = 9999;
+  return d;
+}
+
+function addTyping() {
+  const c = document.getElementById('chat');
+  const d = document.createElement('div');
+  d.className = 'msg ai';
+  d.innerHTML = '<div class="av ai">⬡</div><div class="bub"><div class="typing"><span></span><span></span><span></span></div></div>';
+  c.appendChild(d); c.scrollTop = 9999;
+  return d;
+}
+
+// load voices early
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+</script>
+</body>
+</html>
